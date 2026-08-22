@@ -18,6 +18,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAPTURE = 1101;
@@ -68,7 +69,7 @@ public class MainActivity extends Activity {
         root.addView(card, matchWrap(dp(18)));
 
         TextView h = new TextView(this);
-        h.setText("開始前需要兩個權限");
+        h.setText("開始前需要權限");
         h.setTextSize(18);
         h.setTextColor(Color.rgb(35, 39, 48));
         h.setTypeface(h.getTypeface(), android.graphics.Typeface.BOLD);
@@ -83,6 +84,19 @@ public class MainActivity extends Activity {
         overlayBtn.setOnClickListener(v -> requestOverlayPermission());
         card.addView(overlayBtn, matchWrap(dp(10)));
 
+        if (isXiaomiFamily()) {
+            Button xiaomiBtn = makeButton("POCO / Xiaomi：開啟其他權限", false);
+            xiaomiBtn.setOnClickListener(v -> openXiaomiPermissions());
+            card.addView(xiaomiBtn, matchWrap(dp(10)));
+
+            TextView xiaomiHint = new TextView(this);
+            xiaomiHint.setText("若藍色方框沒出現，請在其他權限中允許「在背景顯示彈出式視窗／背景彈出介面」之類的選項。不同 HyperOS 版本名稱可能略有差異。");
+            xiaomiHint.setTextSize(13);
+            xiaomiHint.setTextColor(Color.rgb(145, 82, 24));
+            xiaomiHint.setLineSpacing(0, 1.2f);
+            card.addView(xiaomiHint, matchWrap(dp(12)));
+        }
+
         Button startBtn = makeButton("② 開始螢幕辨識", true);
         startBtn.setOnClickListener(v -> startCaptureFlow());
         card.addView(startBtn, matchWrap(dp(10)));
@@ -92,7 +106,7 @@ public class MainActivity extends Activity {
         card.addView(stopBtn, matchWrap(0));
 
         TextView tips = new TextView(this);
-        tips.setText("使用：\n1. 開始後切到你的數獨 App。\n2. 拖曳藍色方框，讓它剛好包住完整棋盤。\n3. 右下角拖曳可縮放。\n4. 點懸浮控制列「辨識」。\n5. 成功後只會在原本空格顯示答案。\n\n「鎖定」後方框會讓觸控穿透；「自動」會定期重新辨識。");
+        tips.setText("使用：\n1. 按開始並同意螢幕錄製。\n2. 先留在本 App，等藍色 9×9 方框與控制列出現。\n3. 再切到你的數獨 App。\n4. 拖曳藍框，讓它剛好包住完整棋盤。\n5. 右下角拖曳可縮放。\n6. 點懸浮控制列「辨識」。\n7. 成功後只會在原本空格顯示答案。\n\n「鎖定」後方框會讓觸控穿透；「自動」會定期重新辨識。");
         tips.setTextSize(15);
         tips.setTextColor(Color.rgb(77, 84, 101));
         tips.setLineSpacing(0, 1.28f);
@@ -123,7 +137,7 @@ public class MainActivity extends Activity {
     private void requestOverlayPermission() {
         if (Settings.canDrawOverlays(this)) {
             new AlertDialog.Builder(this)
-                    .setMessage("懸浮窗權限已開啟。")
+                    .setMessage("標準懸浮窗權限已開啟。若你是 POCO / Xiaomi 且仍看不到方框，請再開啟『其他權限』中的背景彈出視窗權限。")
                     .setPositiveButton("好", null)
                     .show();
             return;
@@ -131,6 +145,33 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:" + getPackageName()));
         startActivity(intent);
+    }
+
+    private boolean isXiaomiFamily() {
+        String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
+        String brand = Build.BRAND == null ? "" : Build.BRAND;
+        return manufacturer.equalsIgnoreCase("Xiaomi")
+                || brand.equalsIgnoreCase("Xiaomi")
+                || brand.equalsIgnoreCase("POCO")
+                || brand.equalsIgnoreCase("Redmi");
+    }
+
+    private void openXiaomiPermissions() {
+        Intent intent = new Intent("miui.intent.action.APP_PERM_EDITOR");
+        intent.putExtra("extra_pkgname", getPackageName());
+        try {
+            intent.setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity");
+            startActivity(intent);
+            return;
+        } catch (Exception ignored) {}
+        try {
+            intent.setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity");
+            startActivity(intent);
+            return;
+        } catch (Exception ignored) {}
+        Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName()));
+        startActivity(fallback);
     }
 
     private void startCaptureFlow() {
@@ -160,13 +201,18 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(service);
         else startService(service);
 
-        moveTaskToBack(true);
+        // IMPORTANT for Xiaomi/POCO/HyperOS:
+        // Keep this Activity in foreground until the overlay is created. The previous
+        // version immediately moved the task to background, which can make HyperOS
+        // block creation of a new overlay window.
+        Toast.makeText(this, "先等藍色 9×9 方框出現，再切到數獨 App", Toast.LENGTH_LONG).show();
     }
 
     private void stopCapture() {
         Intent stop = new Intent(this, ScreenCaptureService.class);
         stop.setAction(ScreenCaptureService.ACTION_STOP);
-        startService(stop);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(stop);
+        else startService(stop);
     }
 
     private void maybeRequestNotifications() {
