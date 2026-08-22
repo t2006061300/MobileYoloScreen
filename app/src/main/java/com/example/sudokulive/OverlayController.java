@@ -327,7 +327,7 @@ public final class OverlayController {
                         params.y = Math.max(0, Math.min(screenH - newSize, params.y));
                     } else {
                         params.x = Math.max(0, Math.min(screenW - params.width, startX + dx));
-                        params.y = Math.max(0, Math.min(screenX - params.height, startY + dy));
+                        params.y = Math.max(0, Math.min(screenH - params.height, startY + dy));
                     }
                     try { wm.updateViewLayout(this, params); } catch (Exception ignored) {}
                     if (frameChanged != null) frameChanged.run();
