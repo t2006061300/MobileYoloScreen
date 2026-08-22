@@ -18,3 +18,5 @@
 
 ## GitHub Actions 建置
 Push 到 GitHub 後，Actions 會用 Gradle 9.5.0 自動執行 `assembleDebug`。
+
+Diagnostic build marker: 2
