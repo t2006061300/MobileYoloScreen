@@ -1,29 +1,39 @@
-# Mobile YOLO Screen
+# 數獨即時解題（Android）
 
-Android 手機螢幕即時 YOLO ONNX 辨識，透過 MediaProjection 擷取畫面，使用 ONNX Runtime Mobile 推論，並在其他 App 上層顯示偵測框。
+用 Android MediaProjection 擷取螢幕，使用可拖曳/縮放的 9×9 懸浮框定位數獨棋盤，透過 ML Kit OCR 辨識 1–9，使用本機回溯演算法求解，最後把答案覆蓋在原本空格上。
 
-## 使用
+## 功能
+- 螢幕即時擷取（MediaProjection）
+- 可拖曳、縮放 9×9 懸浮辨識框
+- 手動「辨識」與自動每約 1.4 秒辨識
+- ML Kit 本機 OCR（模型隨 APK 打包）
+- 自動驗證題目、回溯求解
+- 只在原本空白格顯示答案
+- 鎖定辨識框後可讓觸控穿透
 
-1. 用 Android Studio 開啟此資料夾並等待 Gradle Sync。
-2. Build > Build APK(s)，安裝產生的 APK。
-3. 在 App 內選擇 `.onnx` 模型；需要自訂類別名稱時再選擇每行一個名稱的 `labels.txt`。
-4. 允許通知、顯示在其他應用程式上層、螢幕錄製權限。
-5. 按「開始螢幕辨識」。通知列的「停止」可結束服務。
+## 使用方式
+1. 安裝 APK。
+2. 開啟「懸浮窗權限」。
+3. 點「開始螢幕辨識」，允許 Android 的螢幕分享提示。
+4. 切到數獨 App，把藍色正方形框拖到完整 9×9 棋盤上，右下角可縮放。
+5. 點懸浮控制列的「辨識」；成功後答案會直接顯示在空格。
+6. 點「鎖定」可讓棋盤框不攔截觸控；也可開啟「自動」。
 
-## 用 GitHub Actions 從手機建置 APK
+## GitHub Actions 建置
+Push 到 GitHub 後，Actions 會用 Gradle 9.5.0 自動執行 `assembleDebug`。完成後在該次 workflow 的 Artifacts 下載 `SudokuLiveSolver-debug`。
 
-每次推送至 `main`／`master` 都會自動執行 `.github/workflows/build-apk.yml`。完成後進入 GitHub 儲存庫的 **Actions**，打開最新一次 `Build Android APK`，在 **Artifacts** 下載 `MobileYoloScreen-debug-apk`，解壓後即可取得可安裝的 `app-debug.apk`。
+這個專案不依賴本機 Gradle wrapper；GitHub Actions 會安裝指定版本，手機上只需要把專案 push 到 GitHub。
 
-## 模型格式
+## 技術需求
+- minSdk 26
+- compileSdk / targetSdk 36
+- AGP 9.3.0
+- Gradle 9.5.0
+- JDK 17
+- ML Kit Text Recognition 16.0.1（bundled）
 
-- 輸入：`float32`、NCHW、RGB、數值 0–1，例如 `[1,3,640,640]`。
-- 支援常見 Ultralytics raw detection 輸出 `[1,4+C,N]` 或 `[1,N,4+C]`。
-- 支援已匯出 NMS 的 `[1,N,6]`：`x1,y1,x2,y2,score,class_id`。
-- 動態輸入尺寸會使用 640×640；固定輸入會自動讀取尺寸。
-- 目前採直接縮放，不做 letterbox。若模型匯出方式不同，需要調整 `YoloEngine.kt` 的解碼器。
-
-## 注意
-
-- Android 不允許擷取 `FLAG_SECURE`、DRM 影片及部分銀行 App 畫面。
-- 推論速度取決於手機 SoC、模型尺寸與輸入解析度；手機優先使用 `yolo11n` / `yolov8n`。
-- App 只畫辨識框，不會自動觸控或操控其他 App。
+## 辨識注意事項
+- 請讓 9×9 棋盤正面、沒有透視變形。
+- 框線盡量貼齊棋盤外框。
+- 若遊戲字型非常特殊，ML Kit 可能把數字誤判；程式會先檢查列/欄/九宮格衝突，不會把明顯錯誤的解答畫上去。
+- 自動模式會短暫隱藏答案層後重新取樣，以避免自己的答案被 OCR 再次讀入。
